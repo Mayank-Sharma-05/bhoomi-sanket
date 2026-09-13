@@ -95,10 +95,20 @@ class MLPredictor:
         row["project_type"] = raw.get("project_type", "highway")
 
         # 2. State and district use label encoders loaded from artifact
-        state_code = raw.get("state_code") or "MH"
-        row["state"] = state_code
-        district_id = raw.get("district_id", 101)
-        row["district"] = district_id
+        STATE_NAME_MAP = {
+            "GJ": "Gujarat", "Gujarat": "Gujarat",
+            "KA": "Karnataka", "Karnataka": "Karnataka",
+            "MH": "Maharashtra", "Maharashtra": "Maharashtra",
+            "OD": "Odisha", "OR": "Odisha", "Odisha": "Odisha",
+            "TN": "Tamil Nadu", "Tamil Nadu": "Tamil Nadu",
+            "UP": "Uttar Pradesh", "Uttar Pradesh": "Uttar Pradesh",
+        }
+        raw_state = raw.get("state_code") or "MH"
+        state_name = STATE_NAME_MAP.get(raw_state, raw_state)
+        row["state"] = state_name
+
+        district_name = raw.get("district_name") or raw.get("district") or raw.get("district_id", 101)
+        row["district"] = district_name
 
         # 3. Numeric feature mapping from the app contract fields into the model feature names.
         row["land_required_hectares"] = raw.get("land_area_ha", -1)
@@ -159,9 +169,9 @@ class MLPredictor:
             if "project_type" in self.label_encoders:
                 row["project_type"] = self._safe_label_transform(self.label_encoders["project_type"], row["project_type"], default=0)
             if "state" in self.label_encoders:
-                row["state"] = self._safe_label_transform(self.label_encoders["state"], state_code, default=-1)
+                row["state"] = self._safe_label_transform(self.label_encoders["state"], state_name, default=-1)
             if "district" in self.label_encoders:
-                row["district"] = self._safe_label_transform(self.label_encoders["district"], district_id, default=-1)
+                row["district"] = self._safe_label_transform(self.label_encoders["district"], district_name, default=-1)
             if "current_stage" in self.label_encoders:
                 row["current_stage"] = self._safe_label_transform(self.label_encoders["current_stage"], row["current_stage"], default=-1)
             if "compensation_status" in self.label_encoders:
@@ -177,12 +187,8 @@ class MLPredictor:
         raw_df = raw_df[self.feature_columns]
 
         # Convert all object tokens to numeric for the xgboost matrix by using label encoder transform above.
-        # Preserve exact object rows only as labels for mapping; this will be empty for most model stem columns.
         for col in self.feature_columns:
-            if col in {"Source.Name", "project_type", "state", "district", "current_stage", "compensation_status", "rr_status"}:
-                raw_df[col] = pd.to_numeric(raw_df[col], errors="coerce").fillna(-1)
-            else:
-                raw_df[col] = pd.to_numeric(raw_df[col], errors="coerce").fillna(-1)
+            raw_df[col] = pd.to_numeric(raw_df[col], errors="coerce").fillna(-1)
 
         return raw_df
 
@@ -192,7 +198,7 @@ class MLPredictor:
 
         row = self._feature_row_from_request(request)
         try:
-            prob = float(self.model.predict_proba(row)[0, 1])
+            prob = float(self.model.predict_proba(row.to_numpy())[0, 1])
             if not np.isfinite(prob):
                 raise ValueError("Model probability output is not finite")
         except Exception as exc:

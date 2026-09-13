@@ -16,8 +16,8 @@ interface ProjectSummaryItem {
   state_code: string;
   total_cases: number;
   active_cases: number;
-  highest_risk_tier: RiskLevel;
-  avg_risk_probability: number;
+  highest_risk_tier: RiskLevel | null | "UNAVAILABLE";
+  avg_risk_probability: number | null;
   is_demo_data?: boolean;
 }
 
@@ -39,7 +39,12 @@ export const ProjectRankList: React.FC<ProjectRankListProps> = ({ projects }) =>
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return projects.filter((p) => {
-      const matchesTier = filterTier === "ALL" || p.highest_risk_tier === filterTier;
+      const matchesTier =
+        filterTier === "ALL"
+          ? true
+          : filterTier === "UNAVAILABLE"
+          ? !p.highest_risk_tier || p.highest_risk_tier === "UNAVAILABLE"
+          : p.highest_risk_tier === filterTier;
       if (!matchesTier) return false;
       if (!q) return true;
       return (
@@ -56,7 +61,7 @@ export const ProjectRankList: React.FC<ProjectRankListProps> = ({ projects }) =>
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
 
-  const getTierDot = (tier: RiskLevel) => {
+  const getTierDot = (tier: string | null) => {
     switch (tier) {
       case "CRITICAL":
         return "bg-red-600";
@@ -122,6 +127,7 @@ export const ProjectRankList: React.FC<ProjectRankListProps> = ({ projects }) =>
               <option value="HIGH">{t("common.high")}</option>
               <option value="MEDIUM">{t("common.medium")}</option>
               <option value="LOW">{t("common.low")}</option>
+              <option value="UNAVAILABLE">Unavailable (GIS Only)</option>
             </select>
           </div>
         )}
@@ -170,7 +176,8 @@ export const ProjectRankList: React.FC<ProjectRankListProps> = ({ projects }) =>
                 </tr>
               ) : (
                 paginatedProjects.map((p) => {
-                  const badgeClass = getRiskLevelBadgeClass(p.highest_risk_tier);
+                  const isAssessed = p.highest_risk_tier && p.highest_risk_tier !== "UNAVAILABLE";
+                  const badgeClass = isAssessed ? getRiskLevelBadgeClass(p.highest_risk_tier as RiskLevel) : "";
                   const dotColor = getTierDot(p.highest_risk_tier);
 
                   return (
@@ -192,15 +199,22 @@ export const ProjectRankList: React.FC<ProjectRankListProps> = ({ projects }) =>
                         <span className="text-slate-400 dark:text-slate-500"> / {p.total_cases} {t("projects.active")}</span>
                       </td>
                       <td className="py-2 px-3">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
-                          {p.highest_risk_tier}
-                        </span>
+                        {p.highest_risk_tier && p.highest_risk_tier !== "UNAVAILABLE" ? (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                            {p.highest_risk_tier}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            Unavailable
+                          </span>
+                        )}
                       </td>
                       <td className="py-2 px-3 font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
-                        {p.total_cases > 0 && p.avg_risk_probability > 0
+                        {p.total_cases > 0 && p.avg_risk_probability !== null && p.avg_risk_probability !== undefined && p.avg_risk_probability > 0
                           ? formatPercentage(p.avg_risk_probability * 100)
                           : "--"}
                       </td>

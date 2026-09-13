@@ -54,8 +54,9 @@ const LeafletMap = dynamic(
                 primary.geometry.coordinates[1],
                 primary.geometry.coordinates[0],
               ];
-              const riskTier = primary.properties?.highest_risk_tier as RiskLevel | undefined;
-              const color = riskTier ? getRiskLevelColor(riskTier) : "#64748b";
+              const riskTier = primary.properties?.highest_risk_tier as string | undefined;
+              const isAssessed = riskTier && riskTier !== "UNAVAILABLE" && ["CRITICAL", "HIGH", "MEDIUM", "LOW"].includes(riskTier);
+              const color = isAssessed ? getRiskLevelColor(riskTier as RiskLevel) : "#94a3b8";
 
               return (
                 <CircleMarker
@@ -63,9 +64,10 @@ const LeafletMap = dynamic(
                   center={coords}
                   radius={count > 1 ? 11 : 8}
                   pathOptions={{
-                    color: "#ffffff",
+                    color: isAssessed ? "#ffffff" : "#64748b",
                     fillColor: color,
-                    fillOpacity: 0.95,
+                    fillOpacity: isAssessed ? 0.95 : 0.65,
+                    dashArray: isAssessed ? undefined : "3, 3",
                     weight: 2,
                   }}
                 >
@@ -86,7 +88,20 @@ const LeafletMap = dynamic(
                         Type: {primary.properties.project_type}
                       </div>
                       <div className="text-slate-700">
-                        Risk Level: <strong className="font-mono">{primary.properties.highest_risk_tier}</strong>
+                        {isAssessed ? (
+                          <>
+                            Risk Level: <strong className="font-mono">{primary.properties.highest_risk_tier}</strong>
+                          </>
+                        ) : (
+                          <div className="mt-0.5">
+                            <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                              Assessment Unavailable
+                            </span>
+                            <div className="text-[9px] text-slate-400 mt-0.5">
+                              Model coverage: GJ, KA, MH, OD, TN, UP
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="text-slate-600">
                         Packages: {primary.properties.total_cases || 0}
@@ -277,7 +292,7 @@ export const DashboardRiskMap: React.FC<DashboardRiskMapProps> = ({
             </span>
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-              {t("riskMap.noData")}
+              Assessment Unavailable
             </span>
           </div>
         </div>

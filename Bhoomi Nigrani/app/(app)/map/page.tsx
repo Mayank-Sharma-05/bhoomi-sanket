@@ -28,6 +28,11 @@ const LeafletMap = dynamic(
     }) {
       const filteredDistricts = useMemo(() => {
         if (selectedTier === "ALL") return districts;
+        if (selectedTier === "UNAVAILABLE") {
+          return districts.filter(
+            (d) => d.properties?.highest_risk_tier === "UNAVAILABLE" || !d.properties?.highest_risk_tier
+          );
+        }
         return districts.filter(
           (d) => d.properties?.highest_risk_tier === selectedTier
         );
@@ -35,6 +40,11 @@ const LeafletMap = dynamic(
 
       const filteredProjects = useMemo(() => {
         if (selectedTier === "ALL") return projects;
+        if (selectedTier === "UNAVAILABLE") {
+          return projects.filter(
+            (p) => p.properties?.highest_risk_tier === "UNAVAILABLE" || !p.properties?.highest_risk_tier
+          );
+        }
         return projects.filter(
           (p) => p.properties?.highest_risk_tier === selectedTier
         );
@@ -58,8 +68,9 @@ const LeafletMap = dynamic(
               d.geometry.coordinates[1],
               d.geometry.coordinates[0],
             ];
-            const riskTier = d.properties?.highest_risk_tier as RiskLevel | undefined;
-            const color = riskTier ? getRiskLevelColor(riskTier) : "#64748b";
+            const riskTier = d.properties?.highest_risk_tier as string | undefined;
+            const isAssessed = riskTier && riskTier !== "UNAVAILABLE" && ["CRITICAL", "HIGH", "MEDIUM", "LOW"].includes(riskTier);
+            const color = isAssessed ? getRiskLevelColor(riskTier as RiskLevel) : "#94a3b8";
 
             return (
               <CircleMarker
@@ -67,9 +78,10 @@ const LeafletMap = dynamic(
                 center={coords}
                 radius={14}
                 pathOptions={{
-                  color: color,
+                  color: isAssessed ? color : "#64748b",
                   fillColor: color,
-                  fillOpacity: 0.45,
+                  fillOpacity: isAssessed ? 0.45 : 0.25,
+                  dashArray: isAssessed ? undefined : "4, 4",
                   weight: 2,
                 }}
               >
@@ -78,12 +90,22 @@ const LeafletMap = dynamic(
                     <div className="font-bold text-slate-900 border-b border-slate-100 pb-1">
                       {d.properties.district_name} District ({d.properties.state_code})
                     </div>
-                    {d.properties.avg_risk_probability !== undefined && (
+                    {isAssessed && d.properties.avg_risk_probability !== undefined && d.properties.avg_risk_probability !== null && (
                       <div className="text-slate-700">
                         Average Risk:{" "}
                         <strong className="font-mono tabular-nums">
                           {Math.round(d.properties.avg_risk_probability * 100)}%
                         </strong>
+                      </div>
+                    )}
+                    {!isAssessed && (
+                      <div className="py-1">
+                        <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 rounded border border-slate-200 text-slate-600">
+                          Assessment Unavailable
+                        </span>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Outside trained model jurisdiction (Trained: GJ, KA, MH, OD, TN, UP)
+                        </p>
                       </div>
                     )}
                     <div className="text-slate-600">Total Projects: {d.properties.total_projects || 0}</div>
@@ -111,7 +133,9 @@ const LeafletMap = dynamic(
                 primary.geometry.coordinates[1],
                 primary.geometry.coordinates[0],
               ];
-              const color = getRiskLevelColor(primary.properties.highest_risk_tier);
+              const riskTier = primary.properties?.highest_risk_tier as string | undefined;
+              const isAssessed = riskTier && riskTier !== "UNAVAILABLE" && ["CRITICAL", "HIGH", "MEDIUM", "LOW"].includes(riskTier);
+              const color = isAssessed ? getRiskLevelColor(riskTier as RiskLevel) : "#94a3b8";
 
               return (
                 <CircleMarker
@@ -119,9 +143,10 @@ const LeafletMap = dynamic(
                   center={coords}
                   radius={count > 1 ? 9 : 7}
                   pathOptions={{
-                    color: "#ffffff",
+                    color: isAssessed ? "#ffffff" : "#64748b",
                     fillColor: color,
-                    fillOpacity: 0.95,
+                    fillOpacity: isAssessed ? 0.95 : 0.65,
+                    dashArray: isAssessed ? undefined : "3, 3",
                     weight: 2,
                   }}
                 >
@@ -135,11 +160,27 @@ const LeafletMap = dynamic(
                           </span>
                         )}
                       </div>
+                      <div className="text-slate-600">
+                        {primary.properties.district_name}, {primary.properties.state_code}
+                      </div>
                       <div className="capitalize text-slate-600 text-[11px]">
                         Type: {primary.properties.project_type}
                       </div>
                       <div className="text-slate-700">
-                        Risk Tier: <strong className="font-mono">{primary.properties.highest_risk_tier}</strong>
+                        {isAssessed ? (
+                          <>
+                            Risk Tier: <strong className="font-mono">{primary.properties.highest_risk_tier}</strong>
+                          </>
+                        ) : (
+                          <div className="mt-1">
+                            <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                              Assessment Unavailable
+                            </span>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              Model coverage: GJ, KA, MH, OD, TN, UP
+                            </p>
+                          </div>
+                        )}
                       </div>
                       <div className="text-slate-600">Packages: {primary.properties.total_cases || 0}</div>
                     </div>
@@ -222,7 +263,7 @@ export default function GISMapPage() {
             <Filter className="w-3 h-3 text-slate-400 dark:text-slate-500" />
             <span className="hidden sm:inline">Tier:</span>
           </div>
-          {(["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"] as const).map((tier) => (
+          {(["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW", "UNAVAILABLE"] as const).map((tier) => (
             <button
               key={tier}
               onClick={() => setSelectedTier(tier)}
@@ -232,7 +273,7 @@ export default function GISMapPage() {
                   : "bg-slate-100/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
               }`}
             >
-              {tier}
+              {tier === "UNAVAILABLE" ? "UNASSESSED" : tier}
             </button>
           ))}
         </div>
@@ -258,6 +299,10 @@ export default function GISMapPage() {
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
               {t("common.low")}
+            </span>
+            <span className="flex items-center gap-1.5 col-span-2 border-t border-slate-100 dark:border-slate-800 pt-1 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-slate-400 border border-slate-500 border-dashed shrink-0" />
+              Assessment Unavailable (GIS Only)
             </span>
           </div>
         </div>

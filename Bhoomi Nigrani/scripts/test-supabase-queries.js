@@ -1,4 +1,4 @@
-﻿const { Client } = require('pg');
+const { Client } = require('pg');
 const fs = require('fs');
 
 const envContent = fs.readFileSync('.env.local', 'utf-8');
@@ -15,24 +15,32 @@ async function test() {
   const client = new Client({ connectionString: sessionUrl, ssl: { rejectUnauthorized: false } });
   await client.connect();
 
-  const pRes = await client.query(`
-    SELECT p.id, p.project_name, count(c.id)::int as case_count
-    FROM projects p
-    LEFT JOIN acquisition_cases c ON p.id = c.project_id
-    GROUP BY p.id
-    ORDER BY count(c.id) DESC
-    LIMIT 5;
-  `);
-  console.log("Top 5 projects with case count from Supabase:", pRes.rows);
+  await client.query("DELETE FROM projects WHERE id LIKE 'proj-%';");
 
-  const singleProject = await client.query(`
-    SELECT p.*, count(c.id)::int as case_count
+  const summary = await client.query(`
+    SELECT 
+      COUNT(*) as total_projects, 
+      COUNT(DISTINCT state_code) as state_count, 
+      COUNT(DISTINCT district_name) as district_count 
+    FROM projects;
+  `);
+  console.log("Projects summary:", summary.rows[0]);
+
+  const stateBreakdown = await client.query(`
+    SELECT 
+      p.state_code, 
+      p.state_name, 
+      COUNT(DISTINCT p.id) as project_count,
+      COUNT(c.id) as case_count,
+      COUNT(c.id) FILTER (WHERE c.assessment_json IS NOT NULL) as assessed_cases,
+      COUNT(c.id) FILTER (WHERE c.assessment_json IS NULL) as unassessed_cases
     FROM projects p
     LEFT JOIN acquisition_cases c ON p.id = c.project_id
-    WHERE p.id = 'PRJ-IN-202'
-    GROUP BY p.id;
+    GROUP BY p.state_code, p.state_name
+    ORDER BY p.state_code ASC;
   `);
-  console.log("PRJ-IN-202 lookup result:", singleProject.rows[0]);
+  console.log("\nState Breakdown (Total States: " + stateBreakdown.rows.length + "):");
+  console.table(stateBreakdown.rows);
 
   await client.end();
 }
