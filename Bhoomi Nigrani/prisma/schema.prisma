@@ -1,0 +1,152 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model State {
+  id         Int        @id @default(autoincrement())
+  stateCode  String     @unique @map("state_code")
+  stateName  String     @map("state_name")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  districts  District[]
+  projects   Project[]
+
+  @@map("states")
+}
+
+model District {
+  id           Int       @id @default(autoincrement())
+  districtName String    @map("district_name")
+  stateCode    String    @map("state_code")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  state        State     @relation(fields: [stateCode], references: [stateCode])
+  projects     Project[]
+
+  @@unique([districtName, stateCode])
+  @@map("districts")
+}
+
+model Project {
+  id                  String            @id
+  projectName         String            @map("project_name")
+  projectType         String            @map("project_type")
+  fundingModel        String            @default("government") @map("funding_model")
+  implementingAgency  String?           @map("implementing_agency")
+  districtId          Int               @map("district_id")
+  districtName        String            @map("district_name")
+  stateCode           String            @map("state_code")
+  stateName           String            @map("state_name")
+  landAreaHa          Float?            @map("land_area_ha")
+  numAffectedFamilies Int?              @map("num_affected_families")
+  budgetCrore         Float?            @map("budget_crore")
+  projectStartDate    String?           @map("project_start_date")
+  description         String?
+  isDemoData          Boolean           @default(false) @map("is_demo_data")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @default(now()) @updatedAt @map("updated_at")
+  
+  district            District          @relation(fields: [districtId], references: [id])
+  state               State             @relation(fields: [stateCode], references: [stateCode])
+  cases               AcquisitionCase[]
+  dataImports         DataImport[]
+
+  @@map("projects")
+}
+
+model AcquisitionCase {
+  id                    String    @id
+  projectId             String    @map("project_id")
+  caseNumber            String    @map("case_number")
+  caseTitle             String    @map("case_title")
+  currentStage          String    @default("SIA") @map("current_stage")
+  stageEntryDate        String    @map("stage_entry_date")
+  statutoryDeadlineDate String?   @map("statutory_deadline_date")
+  benchmarkDeadlineDate String?   @map("benchmark_deadline_date")
+  siaStarted            Boolean   @default(false) @map("sia_started")
+  publicHearingHeld     Boolean   @default(false) @map("public_hearing_held")
+  objectionsFiledCount  Int       @default(0) @map("objections_filed_count")
+  legalCasesPending     Int       @default(0) @map("legal_cases_pending")
+  courtStayActive       Boolean   @default(false) @map("court_stay_active")
+  avgDisputeAgeDays     Int       @default(0) @map("avg_dispute_age_days")
+  compAwardedCrore      Float?    @map("comp_awarded_crore")
+  compDisbursedCrore    Float     @default(0) @map("comp_disbursed_crore")
+  compDisputesPending   Int       @default(0) @map("comp_disputes_pending")
+  maxPendingDaysComp    Int       @default(0) @map("max_pending_days_comp")
+  rrPlanApproved        Boolean   @default(false) @map("rr_plan_approved")
+  familiesResettled     Int       @default(0) @map("families_resettled")
+  clearTitlePercent     Float     @default(100) @map("clear_title_percent")
+  forestLandInvolved    Boolean   @default(false) @map("forest_land_involved")
+  tribalArea            Boolean   @default(false) @map("tribal_area")
+  stakeholderMeetingsCount Int    @default(0) @map("stakeholder_meetings_count")
+  overallStatus         String    @default("ACTIVE") @map("overall_status")
+  assessmentJson        String?   @map("assessment_json")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  project               Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, caseNumber])
+  @@map("acquisition_cases")
+}
+
+model StageDurationConfig {
+  stage          String   @id
+  durationType    String   @map("duration_type")
+  defaultDays    Int      @map("default_days")
+  legalReference String   @map("legal_reference")
+  isStatutory    Boolean  @default(false) @map("is_statutory")
+  description    String?
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("stage_duration_configs")
+}
+
+model Alert {
+  id           String   @id
+  caseId       String   @map("case_id")
+  caseTitle    String   @map("case_title")
+  projectName  String   @map("project_name")
+  alertType    String   @map("alert_type")
+  severity     String
+  title        String
+  message      String
+  acknowledged Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("alerts")
+}
+
+model AuditLog {
+  id         String   @id
+  userId     String   @map("user_id")
+  userName   String   @map("user_name")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  details    String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+model DataImport {
+  id                String   @id
+  projectId         String   @map("project_id")
+  sourceFilename    String   @map("source_filename")
+  sourceType        String   @map("source_type")
+  fileSizeBytes     Int      @map("file_size_bytes")
+  uploadedBy        String   @map("uploaded_by")
+  uploaderName      String   @map("uploader_name")
+  recordsCount      Int      @map("records_count")
+  validationStatus  String   @map("validation_status")
+  validationSummary String   @map("validation_summary")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("data_imports")
+}
