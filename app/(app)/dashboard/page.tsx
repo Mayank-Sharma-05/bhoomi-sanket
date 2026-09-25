@@ -31,16 +31,38 @@ export default function DashboardPage() {
       ]);
 
       const [sumData, projData, alertData, gisData] = await Promise.all([
-        sumRes.json(),
-        projRes.json(),
-        alertRes.json(),
-        gisRes.json(),
+        sumRes.json().catch(() => ({})),
+        projRes.json().catch(() => ({})),
+        alertRes.json().catch(() => ({})),
+        gisRes.json().catch(() => ({})),
       ]);
 
-      if (sumData.success) setSummary(sumData.data);
-      if (projData.success) setProjects(projData.data);
-      if (alertData.success) setAlerts(alertData.data);
-      if (gisData.features) setGisFeatures(gisData.features);
+      console.log("[Dashboard API Response - Summary]:", sumData);
+      console.log("[Dashboard API Response - Projects]:", projData);
+      console.log("[Dashboard API Response - Alerts]:", alertData);
+      console.log("[Dashboard API Response - GIS]:", gisData);
+
+      if (sumData && sumData.success) {
+        setSummary(sumData.data);
+      } else if (projData && projData.success && Array.isArray(projData.data)) {
+        const pList = projData.data;
+        const totalCases = pList.reduce((acc: number, p: any) => acc + (p.total_cases || 0), 0);
+        const activeCases = pList.reduce((acc: number, p: any) => acc + (p.active_cases || 0), 0);
+        const highRisk = pList.filter((p: any) => p.highest_risk_tier === "HIGH" || p.highest_risk_tier === "CRITICAL").length;
+        const avgRisk = pList.length > 0 ? Number((pList.reduce((acc: number, p: any) => acc + (p.avg_risk_probability || 0), 0) / pList.length).toFixed(3)) : 0;
+        setSummary({
+          total_projects: pList.length,
+          total_cases: totalCases,
+          active_cases: activeCases,
+          critical_cases: 0,
+          high_risk_cases: highRisk,
+          avg_risk_probability: avgRisk,
+        });
+      }
+
+      if (projData && projData.success && Array.isArray(projData.data)) setProjects(projData.data);
+      if (alertData && alertData.success && Array.isArray(alertData.data)) setAlerts(alertData.data);
+      if (gisData && Array.isArray(gisData.features)) setGisFeatures(gisData.features);
 
       setLastSyncTime(
         new Date().toLocaleTimeString("en-IN", {
@@ -114,7 +136,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Telemetry KPI Strip */}
-      <SummaryCards data={summary} loading={loading} />
+      <SummaryCards data={summary} loading={loading} projects={projects} />
 
       {/* Prominent Project Risk Map Section */}
       <DashboardRiskMap

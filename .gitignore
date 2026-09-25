@@ -69,5 +69,6 @@ Thumbs.db
 prisma/*.db
 prisma/*.db-journal
 dev.db
+*.tsbuildinfo
 
 

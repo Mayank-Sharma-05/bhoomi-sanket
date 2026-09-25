@@ -15,6 +15,10 @@ export const CountUpMetric: React.FC<CountUpMetricProps> = ({
   decimalPlaces = 0,
   className = "",
 }) => {
+  const isNonNumeric = typeof value === "string" && !/[\d]/.test(value);
+
+  const effectiveSuffix = suffix || (typeof value === "string" && value.includes("%") ? "%" : "");
+
   const numberValue = useMemo(() => {
     if (typeof value === "number") return value;
     const parsed = Number.parseFloat(String(value).replace(/[^0-9.\-]/g, ""));
@@ -60,14 +64,21 @@ export const CountUpMetric: React.FC<CountUpMetricProps> = ({
     };
   }, [numberValue, prefersReducedMotion]);
 
-  const display = Number.isInteger(numberValue)
+  if (isNonNumeric) {
+    console.log("[CountUpMetric values]:", { rawValue: value, display: value, isNonNumeric: true });
+    return <span className={`tabular-nums ${className}`}>{value}</span>;
+  }
+
+  const display = Number.isInteger(numberValue) && decimalPlaces === 0
     ? Math.round(displayValue)
     : displayValue.toFixed(decimalPlaces);
+
+  console.log("[CountUpMetric values]:", { rawValue: value, numberValue, displayValue, display, suffix: effectiveSuffix });
 
   return (
     <span className={`tabular-nums ${className}`}> 
       {display}
-      {suffix}
+      {effectiveSuffix}
     </span>
   );
 };
