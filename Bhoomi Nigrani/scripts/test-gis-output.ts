@@ -10,7 +10,7 @@ if (fs.existsSync(".env.local")) {
   });
 }
 
-import { supabaseDb } from "../lib/supabase/db";
+import { supabaseDb } from "../../lib/supabase/db";
 
 async function testGis() {
   console.log("=== Testing GIS Fast Endpoints & Coordinates ===");
